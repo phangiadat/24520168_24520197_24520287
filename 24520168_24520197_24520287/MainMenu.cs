@@ -69,7 +69,7 @@ namespace _24520168_24520197_24520287
                 "Controls:\n" +
                 "- Left / Right: move\n" +
                 "- Up: jump\n" +
-                "- Space: fire projectile\n\n" +
+                "- A: fire projectile\n\n" +
                 "Goal:\n" +
                 "- Kill enemies with projectiles or jump on their head.\n" +
                 "- If HP reaches 0 you'll return to this menu.";

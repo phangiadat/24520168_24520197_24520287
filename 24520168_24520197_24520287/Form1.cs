@@ -158,7 +158,7 @@ namespace _24520168_24520197_24520287
         protected override void OnKeyDown(KeyEventArgs e)
         {
             // Fire on Space
-            if (e.KeyCode == Keys.Space)
+            if (e.KeyCode == Keys.A)
             {
                 var proj = player.Fire();
                 if (proj != null)
