@@ -21,6 +21,10 @@ namespace _24520168_24520197_24520287
         private float idleTimer; //Thời gian đứng yên
         private bool facingRight;
 
+        //Máu
+        public int MaxHealth { get; private set; }
+        public int Health { get; private set; }
+
         public bool isDead { get; set; }
         public Enemy(float x, float y, Player player)
         {
@@ -32,7 +36,22 @@ namespace _24520168_24520197_24520287
             random = new Random();
             idleTimer = 0;
             facingRight = true;
+
+            MaxHealth = 50;
+            Health = MaxHealth;
+            isDead  = false;
         }
+
+        public void TakeDamage(int amount)
+        {
+            Health -= amount;
+            if (Health <= 0)
+            {
+                Health = 0;
+                isDead = true;
+            }
+        }
+
         public override void Draw(Graphics g)
         {
             // Vẽ body
@@ -48,6 +67,17 @@ namespace _24520168_24520197_24520287
             {
                 g.FillEllipse(Brushes.Yellow, X + 7, Y + 15, 8, 8);
             }
+
+            //Vẽ thanh máu
+            float barW = Width;
+            float barH = 5f;
+            float barX = X;
+            float barY = Y - 8f;
+            g.FillRectangle(Brushes.Red, barX, barY, barW, barH);
+            float ratio = (MaxHealth > 0) ? (float)Health / MaxHealth : 0f;
+            g.FillRectangle(Brushes.LimeGreen, barX, barY, barW * ratio, barH);
+            g.DrawRectangle(Pens.Black, barX, barY, barW, barH);
+
         }
 
         public override void Update(List<Platform> platforms)

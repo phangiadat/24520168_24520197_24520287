@@ -18,6 +18,17 @@ namespace _24520168_24520197_24520287
         private Dictionary<Keys, bool> keyStates; //Trạng thái phím bấm
         private bool canJump; //Kiểm tra xem nhân vật có thể nhảy hay không
 
+        //Hướng quay mặt và bắn
+        private int facing = 1; //1: phải, -1: trái/
+        private float fireCooldown = 0f;
+        private const float FireRate = 0.35f;
+
+        //Máu
+        public int MaxHealth { get; private set; }
+        public int Health { get; private set; }
+
+        public event EventHandler PlayerDied;
+
         public Player(float x, float y)
         {
             X = x;
@@ -33,6 +44,9 @@ namespace _24520168_24520197_24520287
                 { Keys.Right, false },//Phím di chuyển ngang
                 { Keys.Up, false }, //Phím nhảy
             };
+
+            MaxHealth = 100;
+            Health = MaxHealth;
         }
         public void SetKeyState(Keys key, bool isPressed)
         {
@@ -42,6 +56,35 @@ namespace _24520168_24520197_24520287
             }
         }
 
+        public void TakeDamage(int amount)
+        {
+            Health -= amount;
+            if(Health < 0)
+            {
+                Health = 0;
+                OnPlayerDied();
+            }
+        }
+
+        protected virtual void OnPlayerDied()
+        {
+            PlayerDied?.Invoke(this, EventArgs.Empty);
+        }
+
+        public Projectile Fire()
+        {
+            if (fireCooldown > 0) return null;
+            float px = X + Width / 2f;
+            float py = Y + Height / 2f;
+            float speed = 10f; 
+            float vx = speed * facing;
+            float vy = 0;
+            int damage = 20;
+            var proj = new Projectile(px, py, vx, vy, 5f, damage, this);
+
+            fireCooldown = FireRate;
+            return proj;
+        }
 
         public override void Draw(Graphics g)
         {
@@ -50,18 +93,33 @@ namespace _24520168_24520197_24520287
 
             g.FillEllipse(Brushes.White, X + 10, Y + 15, 8, 8); // Mắt trái
             g.FillEllipse(Brushes.White, X + 22, Y + 15, 8, 8); // Mắt phải
+
+            //Vẽ thanh máu cho player nha
+            float barW = Width;
+            float barH = 6;
+            float barX = X;
+            float barY = Y - barH - 2;
+            g.FillRectangle(Brushes.Red, barX, barY, barW, barH);
+            float ratio = (MaxHealth > 0) ? (float)Health / MaxHealth : 0;
+            g.FillRectangle(Brushes.LimeGreen, barX, barY, barW * ratio, barH);
+            g.DrawRectangle(Pens.Black, barX, barY, barW, barH);
         }
 
         public override void Update(List<Platform> platforms)
         {
+            if (fireCooldown > 0f)
+                fireCooldown -= 0.016f;
+
             VelocityX = 0;
             if(keyStates[Keys.Left])
             {
                 VelocityX = -MoveSpeed;
+                facing = -1;
             }
             if(keyStates[Keys.Right])
             {
                 VelocityX = MoveSpeed;
+                facing = 1;
             }
             if(keyStates[Keys.Up] && IsOnGround && canJump)
             {
