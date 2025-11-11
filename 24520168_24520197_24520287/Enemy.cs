@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Media;
 using System.Net.Mail;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace _24520168_24520197_24520287
 {
@@ -21,11 +23,35 @@ namespace _24520168_24520197_24520287
         private float idleTimer; //Thời gian đứng yên
         private bool facingRight;
 
+        // Âm thanh của Địch
+        private static SoundPlayer hitSound;
+        private static SoundPlayer deathSound;
+
         //Máu
         public int MaxHealth { get; private set; }
         public int Health { get; private set; }
 
         public bool isDead { get; set; }
+
+        // Khởi tạo âm thanh
+        static Enemy()
+        {
+            try
+            {
+                hitSound = new SoundPlayer(Application.StartupPath + "\\resources\\Enemy Hurt.wav");
+                hitSound.Load(); // tải âm thanh khi nhận sát thương
+
+                deathSound = new SoundPlayer(Application.StartupPath + "\\resources\\Enemy Death.wav");
+                deathSound.Load(); // tải âm thanh khi chết
+            }
+            catch(Exception ex) // xử lí lỗi tải âm thanh
+            {
+                Console.WriteLine("Error loading enemy sound: " + ex.Message);
+                hitSound = null;
+                deathSound = null;
+            }
+        }
+
         public Enemy(float x, float y, Player player)
         {
             X = x;
@@ -44,11 +70,24 @@ namespace _24520168_24520197_24520287
 
         public void TakeDamage(int amount)
         {
+            if(isDead) return;
+
             Health -= amount;
+
+            if(hitSound != null && !Form1.SfxMuted)
+            {
+                hitSound.Play();
+            }
+
             if (Health <= 0)
             {
                 Health = 0;
                 isDead = true;
+
+                if(deathSound != null)
+                {
+                    deathSound.Play();
+                }
             }
         }
 

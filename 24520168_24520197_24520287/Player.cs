@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Media;
 
 namespace _24520168_24520197_24520287
 {
@@ -22,12 +23,28 @@ namespace _24520168_24520197_24520287
         private int facing = 1; //1: phải, -1: trái/
         private float fireCooldown = 0f;
         private const float FireRate = 0.35f;
-
+        //Âm thanh player hurt
+        private static SoundPlayer hitPlayer;
         //Máu
         public int MaxHealth { get; private set; }
         public int Health { get; private set; }
 
         public event EventHandler PlayerDied;
+
+        //Khởi tạo âm thanh player hurt
+        static Player()
+        {
+            try
+            {
+                hitPlayer = new SoundPlayer(Application.StartupPath + "\\resources\\Player Hurt.wav");
+                hitPlayer.Load(); //tải âm thanh khi nhận sát thương
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine("Error loading player sound: " + ex.Message);
+                hitPlayer = null;
+            }
+        }
 
         public Player(float x, float y)
         {
@@ -59,7 +76,12 @@ namespace _24520168_24520197_24520287
         public void TakeDamage(int amount)
         {
             Health -= amount;
-            if(Health < 0)
+            if(hitPlayer != null && !Form1.SfxMuted) // âm thanh player bị thương
+            {
+                hitPlayer.Play();
+            }
+
+            if (Health < 0)
             {
                 Health = 0;
                 OnPlayerDied();
