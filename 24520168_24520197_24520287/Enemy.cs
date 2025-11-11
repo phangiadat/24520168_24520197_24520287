@@ -21,17 +21,41 @@ namespace _24520168_24520197_24520287
         private float idleTimer; //Thời gian đứng yên
         private bool facingRight;
 
+        private static Image cactusImage;
+        public static int cactusWidth;
+        public static int cactusHeight;
+
         //Máu
         public int MaxHealth { get; private set; }
         public int Health { get; private set; }
 
+        public bool isSelfKilled { get; set; }
         public bool isDead { get; set; }
+
+        static Enemy()
+        {
+            try
+            {
+                // Thay "Assets\\cactus.png" bằng đường dẫn chính xác của bạn
+                cactusImage = new Bitmap("Assets\\Monster\\monster.png");
+                cactusWidth = cactusImage.Width;
+                cactusHeight = cactusImage.Height;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Không thể tải ảnh Enemy (cactus): {ex.Message}");
+                cactusImage = null;
+                cactusWidth = 35; // Kích thước dự phòng
+                cactusHeight = 50; // Kích thước dự phòng
+            }
+        }
+
         public Enemy(float x, float y, Player player)
         {
             X = x;
             Y = y;
-            Width = 35;
-            Height = 50;
+            Width = cactusWidth;
+            Height = cactusHeight;
             target = player;
             random = new Random();
             idleTimer = 0;
@@ -54,18 +78,29 @@ namespace _24520168_24520197_24520287
 
         public override void Draw(Graphics g)
         {
-            // Vẽ body
-            g.FillRectangle(Brushes.Red, X, Y, Width, Height);
-            g.DrawRectangle(Pens.DarkRed, X, Y, Width, Height);
+            if (isDead) return; // Không vẽ nếu đã chết (hoặc bạn có thể vẽ animation chết)
 
-            // Vẽ mắt theo hướng
-            if (facingRight)
+            if (cactusImage != null)
             {
-                g.FillEllipse(Brushes.Yellow, X + 20, Y + 15, 8, 8);
+                // Vẽ ảnh cây xương rồng
+                Rectangle destRect = new Rectangle((int)X, (int)Y, (int)Width, (int)Height);
+
+                if (facingRight)
+                {
+                    // Vẽ ảnh bình thường (hướng phải)
+                    g.DrawImage(cactusImage, destRect);
+                }
+                else
+                {
+                    // Lật ảnh (hướng trái)
+                    Rectangle flippedRect = new Rectangle((int)X + (int)Width, (int)Y, -(int)Width, (int)Height);
+                    g.DrawImage(cactusImage, flippedRect);
+                }
             }
             else
             {
-                g.FillEllipse(Brushes.Yellow, X + 7, Y + 15, 8, 8);
+                // Dự phòng: Vẽ hình chữ nhật nếu không tải được ảnh
+                g.FillRectangle(Brushes.Red, X, Y, Width, Height);
             }
 
             //Vẽ thanh máu
@@ -133,7 +168,10 @@ namespace _24520168_24520197_24520287
 
             // Rơi xuống hố -> chết
             if (Y > 1000)
+            {
                 isDead = true;
+                isSelfKilled = true;
+            }
         }
 
         private void HandleVerticalCollision(List<Platform> platforms)
