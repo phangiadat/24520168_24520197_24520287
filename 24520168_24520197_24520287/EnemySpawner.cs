@@ -12,7 +12,7 @@ namespace _24520168_24520197_24520287
         private Player player;
         private List<Enemy> enemies;
         private List<Platform> platforms;
-        private int maxEnemies = 5;
+        private int maxEnemies = 8;
 
         public EnemySpawner(Player player, List<Enemy> enemyList, List<Platform> platformList)
         {
@@ -25,10 +25,11 @@ namespace _24520168_24520197_24520287
             spawnTimer.Tick += TrySpawnEnemy;
         }
 
+
         private void TrySpawnEnemy(object sender, EventArgs e)
         {
             // Clean dead enemies
-            enemies.RemoveAll(enemy => enemy.isDead);
+            enemies.RemoveAll(enemy => enemy.isDead); 
 
             if (enemies.Count >= maxEnemies)
                 return;
