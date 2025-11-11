@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using System.IO;
+using System.Windows.Media; // MediaPlayer (WPF) – đã có PresentationCore trong .csproj
 
 namespace _24520168_24520197_24520287
 {
@@ -14,14 +16,27 @@ namespace _24520168_24520197_24520287
         private EnemySpawner spawner;
         private Timer gameTimer;
 
-        float cameraX = 0;
+        // Camera (từ HEAD)
+        private float cameraX = 0f;
+
+        // Pause menu + âm thanh (từ nhánh Binh)
+        private bool isPaused = false;
+        private Panel panelPauseMenu;
+        private Label labelPausedTitle;
+        private Button btnResume;
+        private Button btnQuit;
+        private TrackBar trackBarMusic;
+        private Label labelMusicVolume;
+        private CheckBox chkSfxMute;
+        private MediaPlayer musicPlayer;
+        public static bool SfxMuted = false;
 
         // Projectiles
         private List<Projectile> projectiles;
 
-        private Random rand = new Random(); // Để tạo số ngẫu nhiên
-        private float generationEdgeX = 0; // Vị trí X xa nhất đã tạo platform
-        private float lastPlatformY = 550; // Vị trí Y của platform cuối cùng
+        private readonly Random rand = new Random();
+        private float generationEdgeX = 0;     // X xa nhất đã tạo platform
+        private float lastPlatformY = 550;     // Y của platform cuối cùng
         private const float DespawnBuffer = 500;
 
         private int enemiesKilled = 0;
@@ -30,47 +45,181 @@ namespace _24520168_24520197_24520287
         {
             InitializeComponent();
 
+            // Thiết lập form trước để panel pause căn giữa đúng
             this.DoubleBuffered = true;
             this.KeyPreview = true;
             this.ClientSize = new Size(800, 600);
 
+            InitializePauseMenu(); // tạo control (trackBarMusic…) trước khi init game để set volume
             InitializeGame();
+        }
+
+        private void InitializePauseMenu()
+        {
+            panelPauseMenu = new Panel
+            {
+                Name = "panelPauseMenu",
+                Size = new Size(400, 300),
+                Location = new Point((this.ClientSize.Width - 400) / 2, (this.ClientSize.Height - 300) / 2),
+                BackColor = System.Drawing.Color.FromArgb(200, System.Drawing.Color.Black),
+                BorderStyle = BorderStyle.FixedSingle,
+                Visible = false
+            };
+
+            labelPausedTitle = new Label
+            {
+                Name = "labelPausedTitle",
+                Text = "PAUSED",
+                Font = new Font("Arial", 24, FontStyle.Bold),
+                ForeColor = System.Drawing.Color.White,
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(panelPauseMenu.Width, 50),
+                Location = new Point(0, 20)
+            };
+
+            btnResume = new Button
+            {
+                Name = "btnResume",
+                Text = "Resume",
+                Size = new Size(200, 40),
+                Location = new Point((panelPauseMenu.Width - 200) / 2, 80),
+                BackColor = System.Drawing.Color.Gray,
+                ForeColor = System.Drawing.Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnResume.Click += (sender, e) => TogglePause();
+
+            btnQuit = new Button
+            {
+                Name = "btnQuit",
+                Text = "Quit to Menu",
+                Size = new Size(200, 40),
+                Location = new Point((panelPauseMenu.Width - 200) / 2, 130),
+                BackColor = System.Drawing.Color.Gray,
+                ForeColor = System.Drawing.Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnQuit.Click += (sender, e) => EndGame();
+
+            chkSfxMute = new CheckBox
+            {
+                Name = "chkSfxMute",
+                Text = "Mute SFX",
+                ForeColor = System.Drawing.Color.White,
+                Size = new Size(100, 30),
+                Location = new Point(50, 200)
+            };
+            chkSfxMute.CheckedChanged += (sender, e) => { SfxMuted = chkSfxMute.Checked; };
+
+            labelMusicVolume = new Label
+            {
+                Name = "labelMusicVolume",
+                Text = "Music Volume:",
+                ForeColor = System.Drawing.Color.White,
+                Size = new Size(120, 30),
+                Location = new Point(50, 240)
+            };
+
+            trackBarMusic = new TrackBar
+            {
+                Name = "trackBarMusic",
+                Minimum = 0,
+                Maximum = 100,
+                Value = 50,                 // âm lượng mặc định
+                TickFrequency = 10,
+                Size = new Size(250, 45),
+                Location = new Point(170, 235)
+            };
+            trackBarMusic.ValueChanged += TrackBarMusic_ValueChanged;
+
+            panelPauseMenu.Controls.Add(labelPausedTitle);
+            panelPauseMenu.Controls.Add(btnResume);
+            panelPauseMenu.Controls.Add(btnQuit);
+            panelPauseMenu.Controls.Add(chkSfxMute);
+            panelPauseMenu.Controls.Add(labelMusicVolume);
+            panelPauseMenu.Controls.Add(trackBarMusic);
+
+            this.Controls.Add(panelPauseMenu);
         }
 
         private void InitializeGame()
         {
-            // Random platform generation
-            var rand = new Random();
+            // --- Platforms ---
             platforms = new List<Platform>();
-
             int groundHeight = 50;
-            platforms.Add(new Platform(0, 550, 800, groundHeight)); // Platform đất dài 800px
+            platforms.Add(new Platform(0, 550, 800, groundHeight)); // đất nền
 
-            // 2. Cập nhật các biến theo dõi
-            lastPlatformY = 550; // Vị trí Y của platform đất
-            generationEdgeX = 800; // Bắt đầu tạo platform mới sau platform đất
+            lastPlatformY = 550;
+            generationEdgeX = 800;
 
-            // Player spawns above ground
-            player = new Player(100, 550 - 60); // Đứng trên platform đất
+            // --- Player ---
+            player = new Player(100, this.ClientSize.Height - groundHeight - 60); // đứng trên đất
 
-
-            // Player spawns above ground
-            player = new Player(100, this.ClientSize.Height - groundHeight - 60);
-
-            // Enemies and spawner
+            // --- Enemies & spawner ---
             enemies = new List<Enemy>();
             spawner = new EnemySpawner(player, enemies, platforms);
 
-            // Projectiles
+            // --- Projectiles ---
             projectiles = new List<Projectile>();
 
-            // Game loop
-            gameTimer = new Timer();
-            gameTimer.Interval = 16; // ~60 FPS
+            // --- Nhạc nền ---
+            try
+            {
+                musicPlayer = new MediaPlayer();
+                string musicPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "resources", "attack.mp3");
+                if (File.Exists(musicPath))
+                {
+                    musicPlayer.Open(new Uri(musicPath));
+                    musicPlayer.Volume = trackBarMusic.Value / 100.0; // sync với UI
+                    musicPlayer.MediaEnded += (sender, e) =>
+                    {
+                        musicPlayer.Position = TimeSpan.Zero;
+                        musicPlayer.Play();
+                    };
+                    musicPlayer.Play();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error loading background music: " + ex.Message);
+            }
+
+            // --- Game loop ---
+            gameTimer = new Timer { Interval = 16 }; // ~60 FPS
             gameTimer.Tick += GameLoop;
 
             gameTimer.Start();
             spawner.Start();
+        }
+
+        private void TrackBarMusic_ValueChanged(object sender, EventArgs e)
+        {
+            if (musicPlayer != null)
+            {
+                musicPlayer.Volume = trackBarMusic.Value / 100.0;
+            }
+        }
+
+        private void TogglePause()
+        {
+            isPaused = !isPaused;
+
+            if (isPaused)
+            {
+                gameTimer?.Stop();
+                spawner?.Stop();
+                musicPlayer?.Pause();
+                panelPauseMenu.Visible = true;
+                panelPauseMenu.BringToFront();
+            }
+            else
+            {
+                gameTimer?.Start();
+                spawner?.Start();
+                musicPlayer?.Play();
+                panelPauseMenu.Visible = false;
+            }
         }
 
         private void GameLoop(object sender, EventArgs e)
@@ -78,10 +227,10 @@ namespace _24520168_24520197_24520287
             // Update player
             player.Update(platforms);
 
-            // Update platform
+            // Platforms
             UpdatePlatforms();
 
-            // Update enemies
+            // Enemies
             foreach (var enemy in enemies.ToList())
             {
                 enemy.Update(platforms);
@@ -92,37 +241,33 @@ namespace _24520168_24520197_24520287
                     if (player.VelocityY > 0 && player.Y + player.Height - 10 < enemy.Y + enemy.Height / 2)
                     {
                         enemy.isDead = true;
-                        player.VelocityY = -8; // Bounce
+                        player.VelocityY = -8; // nảy lên
                     }
                     else
                     {
-                        // contact damage (small per tick)
                         player.TakeDamage(1);
                     }
                 }
             }
 
-            // Update projectiles
+            // Projectiles
             foreach (var proj in projectiles.ToList())
             {
                 proj.Update();
 
-                float cameraLeftEdge = cameraX - 100; // Thêm 100px đệm
+                float cameraLeftEdge = cameraX - 100;
                 float cameraRightEdge = cameraX + this.ClientSize.Width + 100;
 
-                // Remove out-of-bounds (so với camera)
                 if (proj.X < cameraLeftEdge || proj.X > cameraRightEdge || proj.Y < -50 || proj.Y > this.ClientSize.Height + 50)
                 {
                     proj.IsDead = true;
                 }
-
                 if (proj.IsDead) continue;
 
-                // Player projectile -> hit enemies
                 if (proj.Owner is Player)
                 {
                     foreach (var enemy in enemies)
-                    { 
+                    {
                         if (proj.GetBounds().IntersectsWith(enemy.GetBounds()))
                         {
                             enemy.TakeDamage(proj.Damage);
@@ -131,7 +276,6 @@ namespace _24520168_24520197_24520287
                         }
                     }
                 }
-                // Enemy projectile -> hit player (not implemented for enemies in current code, but kept for future)
                 else if (proj.Owner is Enemy)
                 {
                     if (proj.GetBounds().IntersectsWith(player.GetBounds()))
@@ -147,7 +291,7 @@ namespace _24520168_24520197_24520287
             int killed = enemies.RemoveAll(e2 => (e2.isDead && !e2.isSelfKilled));
             enemiesKilled += killed;
 
-            // Check player death -> return to main menu
+            // Check player death
             if (player.Health <= 0)
             {
                 EndGame();
@@ -159,11 +303,12 @@ namespace _24520168_24520197_24520287
 
         private void EndGame()
         {
-            // stop timers and spawner cleanly then close the form so menu reappears
             try
             {
                 gameTimer?.Stop();
                 spawner?.Stop();
+                musicPlayer?.Stop();
+                musicPlayer?.Close();
             }
             catch { }
             this.Close();
@@ -171,12 +316,22 @@ namespace _24520168_24520197_24520287
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
-            // Fire on Space
+            // Toggle pause
+            if (e.KeyCode == Keys.Escape)
+            {
+                TogglePause();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                return;
+            }
+
+            if (isPaused) return;
+
+            // Bắn
             if (e.KeyCode == Keys.A)
             {
                 var proj = player.Fire();
-                if (proj != null)
-                    projectiles.Add(proj);
+                if (proj != null) projectiles.Add(proj);
             }
 
             player.SetKeyState(e.KeyCode, true);
@@ -186,6 +341,8 @@ namespace _24520168_24520197_24520287
 
         protected override void OnKeyUp(KeyEventArgs e)
         {
+            if (isPaused && e.KeyCode != Keys.Escape) return;
+
             player.SetKeyState(e.KeyCode, false);
             e.Handled = true;
             e.SuppressKeyPress = true;
@@ -194,36 +351,27 @@ namespace _24520168_24520197_24520287
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            Graphics g = e.Graphics;
+            var g = e.Graphics;
 
+            // Nền
             g.Clear(Color.SkyBlue);
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-            //Camera
-            float targetX = player.X - (this.ClientSize.Width / 2);
+            // Camera follow X
+            float targetX = player.X - (this.ClientSize.Width / 2f);
             cameraX += (targetX - cameraX) * 0.1f;
             g.TranslateTransform(-cameraX, 0);
 
-            foreach (Platform platform in platforms)
-            {
-                platform.Draw(g);
-            }
-
-            foreach (Enemy enemy in enemies)
-            {
-                if (!enemy.isDead)
-                    enemy.Draw(g);
-            }
-
-            foreach (var proj in projectiles)
-            {
-                proj.Draw(g);
-            }
-
+            // Draw world
+            foreach (var platform in platforms) platform.Draw(g);
+            foreach (var enemy in enemies) if (!enemy.isDead) enemy.Draw(g);
+            foreach (var proj in projectiles) proj.Draw(g);
             player.Draw(g);
+
+            // Reset transform cho HUD
             g.ResetTransform();
 
-            // HUD / debug
+            // HUD
             g.DrawString($"Enemies: {enemies.Count(enemy => !enemy.isDead)}", this.Font, Brushes.Black, 10, 10);
             g.DrawString($"On Ground: {player.IsOnGround}", this.Font, Brushes.Black, 10, 30);
             g.DrawString($"Player HP: {player.Health}/{player.MaxHealth}", this.Font, Brushes.Black, 10, 50);
@@ -233,91 +381,65 @@ namespace _24520168_24520197_24520287
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             base.OnFormClosing(e);
-
             try
             {
                 gameTimer?.Stop();
                 gameTimer?.Dispose();
                 spawner?.Stop();
                 spawner?.Dispose();
+                musicPlayer?.Stop();
+                musicPlayer?.Close();
             }
             catch { }
         }
 
-        // Thêm 3 hàm mới này vào Form1.cs
+        // ===== Platform management =====
 
-        /// <summary>
-        /// Được gọi mỗi frame trong GameLoop để quản lý platforms
-        /// </summary>
         private void UpdatePlatforms()
         {
-            // 1. Xóa các platform cũ đã ra khỏi màn hình
             DespawnOldPlatforms();
-
-            // 2. Tạo các platform mới ở phía trước
             GenerateNewPlatforms();
         }
 
-        /// <summary>
-        /// Xóa các platform ở quá xa về bên trái camera
-        /// </summary>
         private void DespawnOldPlatforms()
         {
-            // Vị trí xóa (cách bên trái camera 500px)
             float despawnEdge = cameraX - DespawnBuffer;
-
-            // Xóa tất cả platform mà cạnh phải của nó < vị trí xóa
-            // (Không xóa platform mặt đất đầu tiên nếu bạn muốn)
-            platforms.RemoveAll(p => (p.X + p.Width) < despawnEdge && p.Y < 540); // (Giữ lại đất nền Y=550)
+            // giữ lại đất nền Y=550 (nếu bạn muốn)
+            platforms.RemoveAll(p => (p.X + p.Width) < despawnEdge && p.Y < 540);
         }
 
-        /// <summary>
-        /// Tạo platform mới khi camera di chuyển đến gần cạnh đã tạo
-        /// </summary>
         private void GenerateNewPlatforms()
         {
-            // Vị trí kích hoạt (cách bên phải màn hình 200px)
             float generationTriggerEdge = cameraX + this.ClientSize.Width + 200;
 
-            // Liên tục tạo platform cho đến khi "generationEdgeX" vượt qua "generationTriggerEdge"
             while (generationEdgeX < generationTriggerEdge)
             {
-                // --- 1. Tính toán vị trí platform mới ---
+                int gap = rand.Next(60, 140);
+                int width = rand.Next(100, 250);
 
-                // Khoảng cách ngang ngẫu nhiên so với platform trước
-                int gap = rand.Next(60, 140); // Khoảng trống
-                int width = rand.Next(100, 250); // Độ rộng platform
-
-                // Thay đổi độ cao Y ngẫu nhiên (để có thể nhảy tới)
-                int yChange = rand.Next(-100, 100); // Thay đổi Y
+                int yChange = rand.Next(-100, 100);
                 float newY = lastPlatformY + yChange;
+                newY = Math.Max(newY, 250);
+                newY = Math.Min(newY, 550);
 
-                // Giới hạn Y (để không bay quá cao hoặc quá thấp)
-                newY = Math.Max(newY, 250); // Không cao hơn 250
-                newY = Math.Min(newY, 550); // Không thấp hơn 550 (mặt đất)
-
-                // --- 2. Tạo platform mới ---
                 float newX = generationEdgeX + gap;
-                platforms.Add(new Platform(newX, newY, width, 20)); // Tạo platform
+                platforms.Add(new Platform(newX, newY, width, 20));
 
-                if (rand.Next(100) < 60) // 30% chance
+                if (rand.Next(100) < 60) // 60% xuất hiện enemy (comment gốc ghi 30% nhưng code dùng 60)
                 {
-                    // Tính toán vị trí X (giữa platform) và Y (trên platform)
-                    float enemyX = newX + (width / 2);
-                    float enemyY = newY - Enemy.cactusHeight; // Dùng DesiredHeight từ Enemy.cs
-
+                    float enemyX = newX + (width / 2f);
+                    float enemyY = newY - Enemy.cactusHeight;
                     enemies.Add(new Enemy(enemyX, enemyY, player));
                 }
 
-                // --- 3. Cập nhật biến theo dõi ---
-                lastPlatformY = newY; // Lưu lại Y cho lần tạo sau
-                generationEdgeX = newX + width; // Cập nhật cạnh xa nhất
+                lastPlatformY = newY;
+                generationEdgeX = newX + width;
             }
         }
 
         public void Form1_Load(object sender, EventArgs e)
         {
-
+            Console.WriteLine("Game Started");
         }
     }
 }

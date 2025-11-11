@@ -5,7 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+<<<<<<< HEAD
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
+=======
+using System.Media;
+>>>>>>> Binh
 
 namespace _24520168_24520197_24520287
 {
@@ -34,14 +38,21 @@ namespace _24520168_24520197_24520287
         //Hướng quay mặt và bắn
         private int facing = 1; //1: phải, -1: trái/
         private float fireCooldown = 0f;
+<<<<<<< HEAD
         private const float FireRate = 0.2f;
 
+=======
+        private const float FireRate = 0.35f;
+        //Âm thanh player hurt
+        private static SoundPlayer hitPlayer;
+>>>>>>> Binh
         //Máu
         public int MaxHealth { get; private set; }
         public int Health { get; private set; }
 
         public event EventHandler PlayerDied;
 
+<<<<<<< HEAD
         //Animation
         private Bitmap spriteSheet; // Dùng Bitmap để có thể cắt (crop)
         private int currentFrame = 0;
@@ -60,6 +71,22 @@ namespace _24520168_24520197_24520287
         }
         private PlayerState currentState = PlayerState.Idle;
         private Dictionary<PlayerState, Animation> animations;
+=======
+        //Khởi tạo âm thanh player hurt
+        static Player()
+        {
+            try
+            {
+                hitPlayer = new SoundPlayer(Application.StartupPath + "\\resources\\Player Hurt.wav");
+                hitPlayer.Load(); //tải âm thanh khi nhận sát thương
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine("Error loading player sound: " + ex.Message);
+                hitPlayer = null;
+            }
+        }
+>>>>>>> Binh
 
         public Player(float x, float y)
         {
@@ -125,7 +152,16 @@ namespace _24520168_24520197_24520287
             if (Health <= 0) return;
 
             Health -= amount;
+<<<<<<< HEAD
             if (Health <= 0)
+=======
+            if(hitPlayer != null && !Form1.SfxMuted) // âm thanh player bị thương
+            {
+                hitPlayer.Play();
+            }
+
+            if (Health < 0)
+>>>>>>> Binh
             {
                 Health = 0;
                 OnPlayerDied();
